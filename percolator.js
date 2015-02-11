@@ -4,175 +4,210 @@ var type = 2; //'Squares or diamonds - it will alternate between them at the mom
 var rate = 5; //Number of squares to draw for each animation frame
 var loop = true;
 
-//Get jQuery
+Math.seed = function(s) {
+      return function() {
+                s = Math.sin(s) * 10000; return s - Math.floor(s);
+                    };
+};
 
-function getScript(url, success) {
-  var script = document.createElement('script');
-  script.src = url;
-  var head = document.getElementsByTagName('head')[0],
-      done = false;
-  // Attach handlers for all browsers
-  script.onload = script.onreadystatechange = function() {
-    if (!done && (!this.readyState
-          || this.readyState == 'loaded'
-          || this.readyState == 'complete')) {
-            done = true;
-            success();
-            script.onload = script.onreadystatechange = null;
-            head.removeChild(script);
-          }
+
+//The percolator object - give it any canvas element and it will percolate all over it
+var percolator = function(initialdensity,element,type,rate,seed){
+
+  var width = element.width();
+  var height = element.height();
+  var square = 3;
+  var gap = 1;
+  var t = this;
+  var nx = Math.round(width/(square+gap));
+  var ny = Math.round(height/(square+gap));
+  var paused = false;
+
+  this.bgcol = 'rgba(255,255,255,1)';
+  this.fgcol = 'rgba(0,0,0,0)';
+  var ctx = element[0].getContext('2d');
+
+  this.paused = function(){
+    return paused;
   };
-  head.appendChild(script);
-}
 
-//When jQuer is loaded, asynchronously run everything else
+  this.togglepause = function(){
+    paused = !paused;
+  }
 
-getScript('http://code.jquery.com/jquery-1.10.2.min.js',function() {
+  this.initialize = function(){
 
-    //The percolator object - give it any canvas element and it will percolate all over it
-    var percolator = function(initialdensity,element,type,rate){
+    //Initialize the s, the initial condition
+    t.s = [];
+    console.log('Current seed: ' + seed);
+    Math.random = Math.seed(seed);
+    var match = document.location.href.match(/seed=[0-9]+/);
+    var newurl;
+    if (match){
+     newurl = document.location.href.replace(/seed=[0-9]+/,'seed='+seed);
+    } else {
+      newurl = document.location.href + '&seed=' +seed;
+    }
+    history.pushState({},'',newurl);
+    //type = (type+1)%2;
+    //
+    paused = false;
 
-      var width = element.width();
-      var height = element.height();
-      var square = 3;
-      var gap = 1;
-      var t = this;
-      var nx = Math.round(width/(square+gap));
-      var ny = Math.round(height/(square+gap));
-
-      this.bgcol = 'rgba(255,255,255,1)';
-      this.fgcol = 'rgba(0,0,0,0)';
-      var ctx = element[0].getContext('2d');
-
-
-      this.initialize = function(){
-        //Initialize the s, the initial condition
-        t.s = [];
-        //type = (type+1)%2;
-        for(var ii=0;ii<nx;ii++){
-          t.s[ii] = [];
-          for(var jj=0;jj<ny;jj++){
-            t.s[ii][jj] = Math.random()<initialdensity ? 1 : 0;
-          }
-        }
-        ctx.fillStyle = t.bgcol;
-        ctx.fillRect(0,0,width,height);
-        this.render();
-      };
-
-      this.arrayloop = function(f){
-        for(var ii = 0; ii < nx; ii++){
-          for(var jj = 0; jj< ny; jj++){
-            f(ii,jj);    
-          }
-        }
+    for(var ii=0;ii<nx;ii++){
+      t.s[ii] = [];
+      for(var jj=0;jj<ny;jj++){
+        t.s[ii][jj] = Math.random()<initialdensity ? 1 : 0;
       }
+    }
+    ctx.fillStyle = t.bgcol;
+    ctx.fillRect(0,0,width,height);
+    this.render();
+  };
 
-
-      var np = function(ii,jj){
-        return t.s[(ii+nx)%nx][(jj+ny)%ny];
+  this.arrayloop = function(f){
+    for(var ii = 0; ii < nx; ii++){
+      for(var jj = 0; jj< ny; jj++){
+        f(ii,jj);    
       }
-
-      var updaterule = [function(ii,jj){
-        var change = false;
-        if (np(ii,jj) === 0){
-          change = np(ii-1,jj-1) & np(ii-1,jj) & np(ii-1,jj+1);
-          change = change |  np(ii+1,jj-1) & np(ii+1,jj) & np(ii+1,jj+1);
-          change = change |  np(ii-1,jj-1) & np(ii,jj-1) & np(ii+1,jj-1);
-          change = change |  np(ii-1,jj+1) & np(ii,jj+1) & np(ii+1,jj+1);
-        }
-        return change;
-      },
-          function(ii,jj){
-            var change = false;
-            if (np(ii,jj) === 0){
-              change = np(ii,jj-1) & np(ii+1,jj);
-              change = change | np(ii+1,jj) & np(ii,jj+1);
-              change = change | np(ii,jj+1) & np(ii-1,jj);
-              change = change | np(ii-1,jj) & np(ii,jj-1);
-            }
-            return change;
-          },
-          function(ii,jj){
-            var change = false;
-            if(np(ii,jj)===0){
-            change = (np(ii,jj+1) + np(ii+1,jj) + np(ii-1,jj-1)) >=2;
-            change = change | (np(ii,jj+1) + np(ii-1,jj) + np(ii+1,jj-1)) >= 2;
-            change = change | (np(ii-1,jj) + np(ii,jj-1) + np(ii+1,jj+1)) >= 2;
-            change = change | (np(ii-1,jj+1) + np(ii+1,jj)) + np(ii,jj-1) >= 2;
-            }
-            return change;
-          }
-      ];
+    }
+  }
 
 
-      this.update = function(){
-        var changes = [];
+  var np = function(ii,jj){
+    return t.s[(ii+nx)%nx][(jj+ny)%ny];
+  }
 
-        t.arrayloop(function(ii,jj){
-          var change = updaterule[type](ii,jj);
-          if(change){
-            changes.push([ii,jj]);
-          }
-        });
-
-
-        if(changes.length>0){
-
-          var indices = [];
-          for(var ll=0; ll<changes.length;ll++){
-            indices.push(ll);
-          }
-          indices = shuffle(indices);
-
-          var c;
-          var mm = 0;
-
-          var raf = function(step){
-            for(var rateind = 0; rateind< rate; rateind++){
-              if(mm < indices.length){
-                c = indices[mm];
-                drawSquare(changes[c][0],changes[c][1]);
-                t.s[changes[c][0]][changes[c][1]] = 1;
-                mm++;
-
-              }
-            }
-            if (mm < indices.length){
-              requestAnimationFrame(raf);
-            } else {
-              t.update();
-            }
-          }
-
-          requestAnimationFrame(raf);
-
-        } else {
-          if (loop){
-          t.initialize();
-          t.update();
-          }
-        }
-
-      };
-
-      var drawSquare = function(ii,jj){
-        ctx.clearRect(ii*(square+gap),jj*(square+gap),square,square);
-      };
-
-      this.render = function(){
-
-        t.arrayloop(function(ii,jj){
-          if(t.s[ii][jj] === 1) drawSquare(ii,jj);
-        });
-      }
+  var updaterule = [function(ii,jj){
+    var change = false;
+    if (np(ii,jj) === 0){
+      change = np(ii-1,jj-2) & np(ii-1,jj-1) & np(ii-1,jj) & np(ii-1,jj+1) & np(ii-1,jj+2);
+      change = change |  np(ii+1,jj-2) & np(ii+1,jj-1) & np(ii+1,jj) & np(ii+1,jj+1) & np(ii+1,jj+2);
+      change = change |  np(ii-1,jj-1) & np(ii-1,jj-1) & np(ii,jj-1) & np(ii+1,jj-1) & np(ii-1,jj-1);
+      change = change |  np(ii-2,jj+1) & np(ii-1,jj+1) & np(ii,jj+1) & np(ii+1,jj+1) & np(ii+2,jj+1);
+    }
+    return change;
+  },
+  function(ii,jj){
+    var change = false;
+    if (np(ii,jj) === 0){
+      change = (np(ii-1,jj) + np(ii+1,jj) + np(ii,jj-1) + np(ii,jj+1)) >= 2;
+      //change = np(ii,jj-1) & np(ii+1,jj);
+      //change = change | np(ii+1,jj) & np(ii,jj+1);
+      //change = change | np(ii,jj+1) & np(ii-1,jj);
+      //change = change | np(ii-1,jj) & np(ii,jj-1);
+    }
+    return change;
+  },
+  function(ii,jj){
+    var change = false;
+    if(np(ii,jj)===0){
+      change = (np(ii,jj-1) + np(ii+1,jj) + np(ii-1,jj+1)) >=2;
+      //change = change | (np(ii,jj+1) + np(ii-1,jj) + np(ii+1,jj-1)) >= 2;
+      //change = change | (np(ii-1,jj) + np(ii,jj-1) + np(ii+1,jj+1)) >= 2;
+      //change = change | (np(ii-1,jj+1) + np(ii+1,jj)) + np(ii,jj-1) >= 2;
+    }
+    return change;
+  },
+  function(ii,jj){
+    var change = false;
+    if(np(ii,jj)===0){
+      change = (np(ii-1,jj) + np(ii,jj-1) + np(ii,jj+1)) >= 2;
+    }
+    return change;
+  },
+  function(ii,jj){
+    var change = false;
+    if(np(ii,jj)===0){
+      change = (np(ii-3,jj) + np(ii-2,jj) + np(ii-1,jj)) == 3;
+      //change = change | (np(ii,jj-1) + np(ii,jj-2) + np(ii+1,jj-1) + np(ii+1,jj-2)) == 4;
+      //change = change | (np(ii,jj-1) + np(ii,jj-2) + np(ii-1,jj-1) + np(ii-1,jj-2)) == 4;
+      change = change | (np(ii,jj+1) + np(ii,jj+2) + np(ii+1,jj+1) + np(ii+1,jj+2)) == 4;
+      change = change | (np(ii,jj+1) + np(ii,jj+2) + np(ii-1,jj+1) + np(ii-1,jj+2)) == 4;
+      //change = change | (np(ii-1,jj) + np(ii-2,jj) + np(ii-1,jj+1) + np(ii-2,jj+1)) == 4;
+      //change = change | (np(ii-1,jj) + np(ii-2,jj) + np(ii-1,jj-1) + np(ii-2,jj-1)) == 4;
+      //change = change | (np(ii+1,jj) + np(ii+2,jj) + np(ii+1,jj+1) + np(ii+2,jj+1)) == 4;
+      //change = change | (np(ii+1,jj) + np(ii+2,jj) + np(ii+1,jj-1) + np(ii+2,jj-1)) == 4;
+    }
+    return change;
+  }
+  ];
 
 
-
-      this.initialize();
-
-
+  this.update = function(){
+    if(paused){
+      return;
     };
+    var changes = [];
+
+    t.arrayloop(function(ii,jj){
+      var change = updaterule[type](ii,jj);
+      if(change){
+        changes.push([ii,jj]);
+      }
+    });
+
+
+    if(changes.length>0){
+
+      var indices = [];
+      for(var ll=0; ll<changes.length;ll++){
+        indices.push(ll);
+      }
+      indices = shuffle(indices);
+
+      var c;
+      var mm = 0;
+
+      var raf = function(step){
+        for(var rateind = 0; rateind< rate; rateind++){
+          if(mm < indices.length){
+            c = indices[mm];
+            drawSquare(changes[c][0],changes[c][1]);
+            t.s[changes[c][0]][changes[c][1]] = 1;
+            mm++;
+
+          }
+        }
+        if (mm < indices.length){
+          requestAnimationFrame(raf);
+        } else {
+          t.update();
+        }
+      }
+
+      requestAnimationFrame(raf);
+
+    } else {
+      if (loop){
+        t.setseed()
+        t.initialize();
+        t.update();
+      }
+    }
+
+  };
+
+  var drawSquare = function(ii,jj){
+    ctx.clearRect(ii*(square+gap),jj*(square+gap),square,square);
+  };
+
+  this.setseed = function(){
+        seed = Math.round(1e6*Math.random());
+  }
+
+  this.render = function(){
+
+    t.arrayloop(function(ii,jj){
+      if(t.s[ii][jj] === 1) drawSquare(ii,jj);
+    });
+  }
+
+
+
+  this.initialize();
+
+
+};
 
 
 
@@ -180,7 +215,7 @@ function shuffle(array) {
   var currentIndex = array.length
     , temporaryValue
     , randomIndex
-    ;
+  ;
 
   // While there remain elements to shuffle...
   while (0 !== currentIndex) {
@@ -211,9 +246,7 @@ function getUrlVars()
   return vars;
 }
 
-
-
-$(function(){
+function initpage(){
 
   var urlobj = getUrlVars();
   if(urlobj.density){
@@ -228,7 +261,11 @@ $(function(){
   if(urlobj.loop){
     loop = urlobj.loop ==='true' ;
   }
-
+  if(urlobj.seed){
+    seed = urlobj.seed;
+  } else {
+    seed = Math.round(Math.random()*1e6)
+  }
   //Sort out the DOM so other things aren't borked
   var $bg = $('.bg');
   var w = $bg.width();
@@ -240,8 +277,35 @@ $(function(){
   $canv_wrap.append($canv);
   $bg.prepend($canv_wrap);
 
-  p = new percolator(density,$canv,type,rate);
-  p.update(loop);
-});
+  p = new percolator(density,$canv,type,rate,seed);
 
-});
+  $(window).keypress(function(e) {
+    if (e.keyCode == 0 | e.keyCode == 32) {
+      if (p.paused()){
+        p.togglepause();
+        p.update(loop);
+    } else {
+      p.togglepause();
+    }
+    
+    } 
+  });
+
+  $(window).keydown(function(e){
+    if (e.keyCode== 39){
+      if (!p.paused()){
+      p.togglepause();
+      }
+      p.setseed();
+      p.initialize();
+      p.update(loop);
+    }
+  });
+
+  p.update(loop);
+}
+
+$(initpage);
+
+//$(window).bind('popstate',function(c){window.location.reload();});
+
