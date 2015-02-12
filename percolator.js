@@ -287,11 +287,12 @@ function initpage(){
     } else {
       p.togglepause();
     }
-    
+    e.preventDefault(); 
     } 
   });
 
   $(window).keydown(function(e){
+	  //This is the right arrow thing
     if (e.keyCode== 39){
       if (!p.paused()){
       p.togglepause();
