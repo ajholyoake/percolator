@@ -3,17 +3,11 @@ var density = 0.05;
 var type = 2; //'Squares or diamonds - it will alternate between them at the moment
 var rate = 5; //Number of squares to draw for each animation frame
 var loop = true;
-
-function randomstring(length) {
-    var chars = '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ';
-    var result = '';
-    for (var i = length; i > 0; --i) result += chars[Math.round(Math.random() * (chars.length - 1))];
-    return result;
-}
-
+var seed;
+var $canv;
 
 //The percolator object - give it any canvas element and it will percolate all over it
-var percolator = function(initialdensity,element,type,rate,seed){
+var percolator = function(initialdensity,element,type,rate,inseed){
 
   var width = element.width();
   var height = element.height();
@@ -26,37 +20,29 @@ var percolator = function(initialdensity,element,type,rate,seed){
 
   this.bgcol = 'rgba(255,255,255,1)';
   this.fgcol = 'rgba(0,0,0,0)';
+  this.finished = false;
+  this.history = false;
+  this.s = [];
   var ctx = element[0].getContext('2d');
+  
+  this.seed = inseed;
 
-  this.paused = function(){
-    return paused;
-  };
+  //if we dont' specify a seed, generate a new one for this object
+  //Initialize the s, the initial condition
+  this.initialize = function(nopush){
 
-  this.togglepause = function(){
-    paused = !paused;
-  }
-
-  this.initialize = function(){
-
-    //Initialize the s, the initial condition
-    t.s = [];
-    console.log('Current seed: ' + seed);
-    Math.seedrandom(seed);
-    var match = document.location.href.match(/seed=[0-9a-zA-Z]+/);
-    var newurl;
-    if (match){
-     newurl = document.location.href.replace(/seed=[0-9a-zA-Z]+/,'seed='+seed);
-    } else {
-	    if(document.location.href.match(/\?/)){
-		newurl = document.location.href + '&seed=' +seed;
-	    } else {
-		newurl = document.location.href + '?seed' + seed;
-	    }
+    while(t.s.length>0){
+      t.s.pop();
     }
-    history.pushState({},'',newurl);
-    //type = (type+1)%2;
-    //
-    paused = false;
+
+    Math.seedrandom(t.seed);
+    if(!nopush){
+      t.url();
+    }
+    t.finished = false;
+    t.paused = false;
+    t.history = false;
+    console.log('Initialize seed: ' + t.seed);
 
     for(var ii=0;ii<nx;ii++){
       t.s[ii] = [];
@@ -66,86 +52,29 @@ var percolator = function(initialdensity,element,type,rate,seed){
     }
     ctx.fillStyle = t.bgcol;
     ctx.fillRect(0,0,width,height);
-    this.render();
+    t.render();
   };
 
-  this.arrayloop = function(f){
-    for(var ii = 0; ii < nx; ii++){
-      for(var jj = 0; jj< ny; jj++){
-        f(ii,jj);    
-      }
-    }
-  }
+  this.render = function(){
+    arrayloop(function(ii,jj){
+      if(t.s[ii][jj] === 1) drawSquare(ii,jj);
+    });
+  };
 
 
-  var np = function(ii,jj){
-    return t.s[(ii+nx)%nx][(jj+ny)%ny];
-  }
-
-  var updaterule = [function(ii,jj){
-    var change = false;
-    if (np(ii,jj) === 0){
-      change = np(ii-1,jj-2) & np(ii-1,jj-1) & np(ii-1,jj) & np(ii-1,jj+1) & np(ii-1,jj+2);
-      change = change |  np(ii+1,jj-2) & np(ii+1,jj-1) & np(ii+1,jj) & np(ii+1,jj+1) & np(ii+1,jj+2);
-      change = change |  np(ii-1,jj-1) & np(ii-1,jj-1) & np(ii,jj-1) & np(ii+1,jj-1) & np(ii-1,jj-1);
-      change = change |  np(ii-2,jj+1) & np(ii-1,jj+1) & np(ii,jj+1) & np(ii+1,jj+1) & np(ii+2,jj+1);
-    }
-    return change;
-  },
-  function(ii,jj){
-    var change = false;
-    if (np(ii,jj) === 0){
-      change = (np(ii-1,jj) + np(ii+1,jj) + np(ii,jj-1) + np(ii,jj+1)) >= 2;
-      //change = np(ii,jj-1) & np(ii+1,jj);
-      //change = change | np(ii+1,jj) & np(ii,jj+1);
-      //change = change | np(ii,jj+1) & np(ii-1,jj);
-      //change = change | np(ii-1,jj) & np(ii,jj-1);
-    }
-    return change;
-  },
-  function(ii,jj){
-    var change = false;
-    if(np(ii,jj)===0){
-      change = (np(ii,jj-1) + np(ii+1,jj) + np(ii-1,jj+1)) >=2;
-      //change = change | (np(ii,jj+1) + np(ii-1,jj) + np(ii+1,jj-1)) >= 2;
-      //change = change | (np(ii-1,jj) + np(ii,jj-1) + np(ii+1,jj+1)) >= 2;
-      //change = change | (np(ii-1,jj+1) + np(ii+1,jj)) + np(ii,jj-1) >= 2;
-    }
-    return change;
-  },
-  function(ii,jj){
-    var change = false;
-    if(np(ii,jj)===0){
-      change = (np(ii-1,jj) + np(ii,jj-1) + np(ii,jj+1)) >= 2;
-    }
-    return change;
-  },
-  function(ii,jj){
-    var change = false;
-    if(np(ii,jj)===0){
-      change = (np(ii-3,jj) + np(ii-2,jj) + np(ii-1,jj)) == 3;
-      //change = change | (np(ii,jj-1) + np(ii,jj-2) + np(ii+1,jj-1) + np(ii+1,jj-2)) == 4;
-      //change = change | (np(ii,jj-1) + np(ii,jj-2) + np(ii-1,jj-1) + np(ii-1,jj-2)) == 4;
-      change = change | (np(ii,jj+1) + np(ii,jj+2) + np(ii+1,jj+1) + np(ii+1,jj+2)) == 4;
-      change = change | (np(ii,jj+1) + np(ii,jj+2) + np(ii-1,jj+1) + np(ii-1,jj+2)) == 4;
-      //change = change | (np(ii-1,jj) + np(ii-2,jj) + np(ii-1,jj+1) + np(ii-2,jj+1)) == 4;
-      //change = change | (np(ii-1,jj) + np(ii-2,jj) + np(ii-1,jj-1) + np(ii-2,jj-1)) == 4;
-      //change = change | (np(ii+1,jj) + np(ii+2,jj) + np(ii+1,jj+1) + np(ii+2,jj+1)) == 4;
-      //change = change | (np(ii+1,jj) + np(ii+2,jj) + np(ii+1,jj-1) + np(ii+2,jj-1)) == 4;
-    }
-    return change;
-  }
-  ];
-
-
-  this.update = function(){
+  this.update = function(cb){
+    //cb is the callback when the pattern has finished
     if(paused){
       return;
-    };
+    }
+    if(t.finished){
+      t.onfinish();
+      return;
+    }
     var changes = [];
 
-    t.arrayloop(function(ii,jj){
-      var change = updaterule[type](ii,jj);
+    arrayloop(function(ii,jj){
+      var change = updaterule[type](ii,jj,np);
       if(change){
         changes.push([ii,jj]);
       }
@@ -164,94 +93,97 @@ var percolator = function(initialdensity,element,type,rate,seed){
       var mm = 0;
 
       var raf = function(step){
+
         for(var rateind = 0; rateind< rate; rateind++){
           if(mm < indices.length){
             c = indices[mm];
             drawSquare(changes[c][0],changes[c][1]);
             t.s[changes[c][0]][changes[c][1]] = 1;
             mm++;
-
           }
         }
-        if (mm < indices.length){
+        if (mm < indices.length && !t.finished){
           requestAnimationFrame(raf);
         } else {
           t.update();
         }
-      }
+      };
 
       requestAnimationFrame(raf);
-
     } else {
-      if (loop){
-        t.setseed()
-        t.initialize();
-        t.update();
+      if(!t.finished){
+      t.onfinish();
       }
     }
 
+    };
+
+  this.togglepause = function(){
+    paused = !paused;
+    if(!paused){
+      t.update();
+    }
+  };
+
+  this.onfinish = function(){
+    console.log('seed is now being set as ' + t.seed);
+    Math.seedrandom(t.seed);
+    if(!p.history){
+      t.seed = randomstring(32);
+    }
+    t.initialize(p.history);
+    t.update();
+  };
+
+  this.finish = function(){
+    t.finished=true;
+  };
+
+  //Handle the url for the object
+  this.url = function(){
+    var res = document.location.href.split('?')[0];
+    var state = {seed:t.seed,density:density,type:type,rate:rate};
+    history.pushState(state,'Percolation',createURL(res,state));
+  };
+
+  //Private methods
+  var arrayloop = function(f){
+    for(var ii = 0; ii < nx; ii++){
+      for(var jj = 0; jj< ny; jj++){
+        f(ii,jj);
+      }
+    }
+  };
+
+  var np = function(ii,jj){
+    return t.s[(ii+nx)%nx][(jj+ny)%ny];
   };
 
   var drawSquare = function(ii,jj){
     ctx.clearRect(ii*(square+gap),jj*(square+gap),square,square);
   };
 
-  this.setseed = function(){
-        seed = Math.seedrandom(randomstring(32));
-  }
-
-  this.render = function(){
-
-    t.arrayloop(function(ii,jj){
-      if(t.s[ii][jj] === 1) drawSquare(ii,jj);
-    });
-  }
-
-
-
+  //Initialize the object!
   this.initialize();
-
-
 };
 
+function initDOM(){
 
+  //Sort out the DOM so other things aren't borked
+  var $bg = $('.bg');
+  var w = $bg.width();
+  var h = $bg.height();
+  $bg.css({'background-image':'none'});
+  $bg.children().css({'position':'relative'});
+  var $canv_wrap = $('<div>').attr('id','canv_wrap').css({position:'absolute',float:'left'});
+  var $canv = $('<canvas>').attr('id','canvas').attr('width',w).attr('height',h);
+  $canv_wrap.append($canv);
+  $bg.prepend($canv_wrap);
 
-function shuffle(array) {
-  var currentIndex = array.length
-    , temporaryValue
-    , randomIndex
-  ;
-
-  // While there remain elements to shuffle...
-  while (0 !== currentIndex) {
-
-    // Pick a remaining element...
-    randomIndex = Math.floor(Math.random() * currentIndex);
-    currentIndex -= 1;
-
-    // And swap it with the current element.
-    temporaryValue = array[currentIndex];
-    array[currentIndex] = array[randomIndex];
-    array[randomIndex] = temporaryValue;
-  }
-
-  return array;
+  return $canv;
 }
 
-function getUrlVars()
-{
-  var vars = [], hash;
-  var hashes = window.location.href.slice(window.location.href.indexOf('?') + 1).split('&');
-  for(var i = 0; i < hashes.length; i++)
-  {
-    hash = hashes[i].split('=');
-    vars.push(hash[0]);
-    vars[hash[0]] = hash[1];
-  }
-  return vars;
-}
-
-function initpage(){
+function parseURL(){
 
   var urlobj = getUrlVars();
   if(urlobj.density){
@@ -271,47 +203,49 @@ function initpage(){
   } else {
     seed = randomstring(32);
   }
-  //Sort out the DOM so other things aren't borked
-  var $bg = $('.bg');
-  var w = $bg.width();
-  var h = $bg.height();
-  $bg.css({'background-image':'none'});
-  $bg.children().css({'position':'relative'});
-  var $canv_wrap = $('<div>').attr('id','canv_wrap').css({position:'absolute',float:'left'});
-  var $canv = $('<canvas>').attr('id','canvas').attr('width',w).attr('height',h);
-  $canv_wrap.append($canv);
-  $bg.prepend($canv_wrap);
 
-  p = new percolator(density,$canv,type,rate,seed);
-
-  $(window).keypress(function(e) {
-    if (e.keyCode == 0 | e.keyCode == 32) {
-      if (p.paused()){
-        p.togglepause();
-        p.update(loop);
-    } else {
-      p.togglepause();
-    }
-    e.preventDefault(); 
-    } 
-  });
-
-  $(window).keydown(function(e){
-	  //This is the right arrow thing
-    if (e.keyCode== 39){
-      if (!p.paused()){
-      p.togglepause();
-      }
-      p.setseed();
-      p.initialize();
-      p.update(loop);
-    }
-  });
-
-  p.update(loop);
 }
 
-$(initpage);
 
-//$(window).bind('popstate',function(c){window.location.reload();});
+function initpage(){
+
+
+  $canv = initDOM();
+
+  p = new percolator(density,$canv,type,rate,seed);
+  p.update();
+
+//Space to toggle pause
+  $(window).keypress(function(e) {
+    if (e.keyCode == 32) {
+        p.togglepause();
+      }
+      e.preventDefault();
+    });
+
+//Right arrow to go to the next pattern
+  $(window).keydown(function(e){
+    //This is the right arrow thing
+    if (e.keyCode== 39){
+      p.finish();
+    }
+  });
+  
+  window.onpopstate = function(event){
+    parseURL();
+    p.seed = seed;
+    p.history = true;
+    console.log('parsed seed as ' + seed + " " + p.seed);
+    p.finish();
+  };
+
+}
+
+
+
+$(function(){
+ initDOM();
+ parseURL();
+ initpage();
+});
 
