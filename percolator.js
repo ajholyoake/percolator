@@ -4,11 +4,12 @@ var type = 2; //'Squares or diamonds - it will alternate between them at the mom
 var rate = 5; //Number of squares to draw for each animation frame
 var loop = true;
 
-Math.seed = function(s) {
-      return function() {
-                s = Math.sin(s) * 10000; return s - Math.floor(s);
-                    };
-};
+function randomstring(length) {
+    var chars = '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ';
+    var result = '';
+    for (var i = length; i > 0; --i) result += chars[Math.round(Math.random() * (chars.length - 1))];
+    return result;
+}
 
 
 //The percolator object - give it any canvas element and it will percolate all over it
@@ -40,13 +41,17 @@ var percolator = function(initialdensity,element,type,rate,seed){
     //Initialize the s, the initial condition
     t.s = [];
     console.log('Current seed: ' + seed);
-    Math.random = Math.seed(seed);
-    var match = document.location.href.match(/seed=[0-9]+/);
+    Math.seedrandom(seed);
+    var match = document.location.href.match(/seed=[0-9a-zA-Z]+/);
     var newurl;
     if (match){
-     newurl = document.location.href.replace(/seed=[0-9]+/,'seed='+seed);
+     newurl = document.location.href.replace(/seed=[0-9a-zA-Z]+/,'seed='+seed);
     } else {
-      newurl = document.location.href + '&seed=' +seed;
+	    if(document.location.href.match(/\?/)){
+		newurl = document.location.href + '&seed=' +seed;
+	    } else {
+		newurl = document.location.href + '?seed' + seed;
+	    }
     }
     history.pushState({},'',newurl);
     //type = (type+1)%2;
@@ -192,7 +197,7 @@ var percolator = function(initialdensity,element,type,rate,seed){
   };
 
   this.setseed = function(){
-        seed = Math.round(1e6*Math.random());
+        seed = Math.seedrandom(randomstring(32));
   }
 
   this.render = function(){
@@ -264,7 +269,7 @@ function initpage(){
   if(urlobj.seed){
     seed = urlobj.seed;
   } else {
-    seed = Math.round(Math.random()*1e6)
+    seed = randomstring(32);
   }
   //Sort out the DOM so other things aren't borked
   var $bg = $('.bg');
