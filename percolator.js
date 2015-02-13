@@ -204,6 +204,8 @@ function parseURL(){
   }
   if(urlobj.loop){
     loop = urlobj.loop ==='true' ;
+  } else {
+    loop = false;
   }
   if(urlobj.seed){
     seed = urlobj.seed;
