@@ -27,24 +27,23 @@ var percolator = function(initialdensity,element,type,rate,inseed){
   var ctx = element[0].getContext('2d');
 
   this.seed = inseed;
+  this.dostop = false;
+  this.stopcriteria = {};
 
   //if we dont' specify a seed, generate a new one for this object
   //Initialize the s, the initial condition
-  this.initialize = function(nopush){
+  this.initialize = function(){
 
     while(t.s.length>0){
       t.s.pop();
     }
-
-    Math.seedrandom(t.seed);
-    if(!nopush){
+    t.dostop = false;
+    if(!t.stopcriteria.history){
       t.url();
     }
-    t.finished = false;
-    t.finalized = false;
-    t.paused = false;
-    t.history = false;
-    t.donext = loop;
+    t.stopcriteria={};
+    Math.seedrandom(t.seed);
+
     console.log('Initialize seed: ' + t.seed);
 
     for(var ii=0;ii<nx;ii++){
@@ -65,15 +64,14 @@ var percolator = function(initialdensity,element,type,rate,inseed){
   };
 
 
-  this.update = function(cb){
-    //cb is the callback when the pattern has finished
-    if(paused){
+  this.update = function(){
+    t.running = true;
+
+    if(t.dostop){
+      t.stopcbk();
       return;
     }
-    if(t.finished){
-      t.onfinish();
-      return;
-    }
+
     var changes = [];
 
     arrayloop(function(ii,jj){
@@ -114,37 +112,51 @@ var percolator = function(initialdensity,element,type,rate,inseed){
 
       requestAnimationFrame(raf);
     } else {
-      if(!t.finished){
-      t.onfinish();
-      }
+      t.stopcbk({'finished':true});
     }
 
     };
 
+  this.stop = function(stopobj){
+    t.dostop = true;
+    t.stopcriteria=stopobj;
+    if (!t.running)
+      {t.stopcbk();}
+  };
+
+  this.stopcbk = function(stopobj){
+    t.running = false;
+    obj = stopobj || t.stopcriteria;
+    if(obj.finished && loop || obj.next){
+      //Start again
+      Math.seedrandom(seed);
+      seed = randomstring(32);
+      t.seed = seed;
+      t.initialize();
+      t.update();
+      return;
+    }
+    if(obj.history){
+      //Reset the percolator and start again
+      parseURL();
+      p.seed = seed;
+      p.initialize();
+      p.update();
+      return;
+    }
+
+
+  };
+
   this.togglepause = function(){
-    paused = !paused;
-    if(!paused){
+    if(t.running){
+      t.stop();
+    } else {
+      t.dostop = false;
       t.update();
     }
   };
 
-  this.onfinish = function(){
-    if (t.donext){
-    console.log('seed is now being set as ' + t.seed);
-    Math.seedrandom(t.seed);
-    if(!p.history){
-      t.seed = randomstring(32);
-    }
-    t.initialize(p.history);
-    t.update();
-    } else {
-    t.finalized = true;
-    }
-  };
-
-  this.finish = function(){
-    t.finished=true;
-  };
 
   //Handle the url for the object
   this.url = function(){
@@ -220,7 +232,6 @@ function initpage(){
 
 
   addCanvases();
-
   p = new percolator(density,$canv,type,rate,seed);
   p.update();
 
@@ -236,19 +247,12 @@ function initpage(){
   $(window).keydown(function(e){
     //This is the right arrow thing
     if (e.keyCode== 39){
-      p.donext = true;
-      p.finish();
-      if (p.finalized){
-          p.onfinish();
-      }
+      p.stop({'next':true});
     }
   });
 
   window.onpopstate = function(event){
-    parseURL();
-    p.seed = seed;
-    p.history = true;
-    p.finish();
+    p.stop({'history':true});
   };
 
 }
